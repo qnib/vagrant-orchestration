@@ -1,0 +1,56 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "swarm0",
+    :ip => "192.168.100.10"
+  },{
+    :hostname => "swarm1",
+    :ip => "192.168.100.11"
+  },{
+    :hostname => "swarm2",
+    :ip => "192.168.100.12"
+  }
+]
+
+$script = <<SCRIPT
+   apt-get update
+   rm -f /var/lib/apt/lists/lock
+   #rm /var/lib/dpkg/lock
+   #dpkg --configure -a
+   apt-get install -y apt-transport-https ca-certificates unzip wget
+   # consul-template
+   wget -qO /tmp/consul-template.zip https://releases.hashicorp.com/consul-template/0.15.0/consul-template_0.15.0_linux_amd64.zip
+   cd /usr/local/bin/ ; rm -f consul-template ; unzip /tmp/consul-template.zip ; rm -f /tmp/consul-template.zip
+   chmod +x /usr/local/bin/consul-template
+   mkdir -p /etc/consul-templates/consul/
+   ### copy docker
+   wget -qO - https://test.docker.com/builds/Linux/x86_64/docker-1.12.1-rc1.tgz |tar xfz - --strip-components 1 -C /usr/local/bin/
+   chmod +x /usr/local/bin/docker*
+   # Docker config
+   mkdir -p /etc/consul-templates/docker/
+   cp -f /vagrant/consul-template/docker.service.ctmpl /etc/consul-templates/docker/
+   consul-template -once -template "/etc/consul-templates/docker/docker.service.ctmpl:/lib/systemd/system/docker.service"
+   systemctl daemon-reload
+   systemctl enable docker.service
+   systemctl restart docker.service
+   echo "export DOCKER_HOST=${CONSUL_ADDVERTISE_ADDR}:2376 ; unset DOCKER_TLS_VERIFY ; unset DOCKER_CERT_PATH"
+SCRIPT
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "btexpress/ubuntu64-16.04"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.customize ["modifyvm", :id, "--memory", 1024]
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
