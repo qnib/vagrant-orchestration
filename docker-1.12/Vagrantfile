@@ -26,7 +26,7 @@ $script = <<SCRIPT
    chmod +x /usr/local/bin/consul-template
    mkdir -p /etc/consul-templates/consul/
    ### copy docker
-   wget -qO - https://test.docker.com/builds/Linux/x86_64/docker-1.12.1-rc1.tgz |tar xfz - --strip-components 1 -C /usr/local/bin/
+   wget -qO - https://get.docker.com/builds/Linux/x86_64/docker-1.12.1.tgz |tar xfz - --strip-components 1 -C /usr/local/bin/
    chmod +x /usr/local/bin/docker*
    # Docker config
    mkdir -p /etc/consul-templates/docker/
