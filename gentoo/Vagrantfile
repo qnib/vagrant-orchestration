@@ -1,0 +1,15 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+    config.vm.box = "sorah/gentoo"
+    config.vm.hostname = "gentoo"
+    config.vm.provider :virtualbox do |vb|
+        vb.customize [
+            "modifyvm", :id,
+            "--memory", "4096",
+            "--cpus", "4",
+        ]
+    end
+end
