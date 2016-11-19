@@ -1,0 +1,53 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "swarm0",
+    :ip => "192.168.100.10"
+  },{
+    :hostname => "swarm1",
+    :ip => "192.168.100.11"
+  },{
+    :hostname => "swarm2",
+    :ip => "192.168.100.12"
+  }
+]
+
+$script = <<SCRIPT
+   echo "deb https://apt.dockerproject.org/repo ubuntu-xenial testing" > /etc/apt/sources.list.d/docker.list
+   apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+   apt-get update
+   apt-get install -y --allow-unauthenticated docker-engine
+   cp /vagrant/daemon.json /etc/docker/
+   cp /vagrant/docker.service /lib/systemd/system/docker.service
+   systemctl daemon-reload
+   service docker restart
+   if [ "$(hostname)" == "swarm0" ];then
+     docker swarm init --advertise-addr=192.168.100.10
+     docker swarm join-token manager -q > /vagrant/token
+   fi
+   if [ "$(hostname)" == "swarm1" ];then
+     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
+   fi
+   if [ "$(hostname)" == "swarm2" ];then
+     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
+   fi
+SCRIPT
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "bento/ubuntu-16.04"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.customize ["modifyvm", :id, "--memory", 2048]
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
