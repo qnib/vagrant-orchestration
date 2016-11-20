@@ -35,6 +35,31 @@ $script = <<SCRIPT
    if [ "$(hostname)" == "swarm0" ];then
      docker swarm init --advertise-addr=192.168.100.10
      docker swarm join-token manager -q > /vagrant/token
+     sleep 2
+     # download image
+     for img in alpn-consul alpn-grafana3 influxdb;do
+       docker pull qnib/${img}
+     done
+     # create Metric network
+     docker network create -d overlay metric-net
+     # create service
+     docker service create --replicas=1 --name consul --network=metric-net \
+                           --port target=8500,published=8500,mode=ingress \
+                           -e CONSUL_BOOTSTRAP_EXPECT=1 \
+                           qnib/alpn-consul
+
+     sleep 5
+     docker service create --replicas=1 --name influxdb --network=metric-net \
+                           --port target=8083,published=8083,mode=ingress \
+                           --port target=8086,published=8086,mode=ingress \
+                           -e INFLUXDB_DATABASES=qcollect -e CONSUL_CLUSTER_IPS=consul \
+                           qnib/influxdb
+     docker service create --replicas=1 --name grafana3 --network=metric-net \
+                           -e CONSUL_CLUSTER_IPS=consul \
+                           --port target=3000,published=3000,mode=ingress \
+                           qnib/alpn-grafana3
+     docker service create --name http --mode=global --mode=global \
+                           --port target=80,published=80,mode=ingress qnib/httpcheck
    fi
    if [ "$(hostname)" == "swarm1" ];then
      docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
@@ -42,6 +67,13 @@ $script = <<SCRIPT
    if [ "$(hostname)" == "swarm2" ];then
      docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
    fi
+   wget -qO /usr/local/bin/qcollect  https://github.com/qnib/qcollect/releases/download/0.7.0.0/qcollect_0.7.0.0-dirty-0_Linux
+   chmod +x /usr/local/bin/qcollect
+   cp -r /vagrant/qcollect* /etc/
+   sed -i"" -e "s/HOSTNAME/$(hostname -f)/" /etc/qcollect.conf
+   cp /vagrant/qcollect.service /lib/systemd/system/
+   systemctl enable qcollect
+   systemctl start qcollect
 SCRIPT
 
 # This defines the version of vagrant
