@@ -20,8 +20,14 @@ $script = <<SCRIPT
    apt-get update
    apt-get install -y --allow-unauthenticated docker-engine
    # Download 1.13.0-rc1-experimental
-   curl -fsL https://github.com/ChristianKniep/docker/releases/download/1.13.0-rc1-exp/binary-daemon.tar |tar xf - -C /usr/bin/
-   curl -fsL https://github.com/ChristianKniep/docker/releases/download/1.13.0-rc1-exp/binary-client.tar |tar xf - -C /usr/bin/
+   if [ ! -f /vagrant/binary-daemon.tar ];then
+     curl -fsLo /vagrant/binary-daemon.tar https://github.com/ChristianKniep/docker/releases/download/1.13.0-rc1-exp/binary-daemon.tar
+   fi
+   tar xf /vagrant/binary-daemon.tar -C /usr/bin/ >/dev/null
+   if [ ! -f /vagrant/binary-client.tar ];then
+     curl -fsLo /vagrant/binary-client.tar https://github.com/ChristianKniep/docker/releases/download/1.13.0-rc1-exp/binary-client.tar
+   fi
+   tar xf /vagrant/binary-client.tar -C /usr/bin/ >/dev/null
    cp /vagrant/daemon.json /etc/docker/
    cp /vagrant/docker.service /lib/systemd/system/docker.service
    systemctl daemon-reload
