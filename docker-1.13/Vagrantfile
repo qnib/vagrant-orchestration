@@ -67,7 +67,7 @@ $script = <<SCRIPT
    if [ "$(hostname)" == "swarm2" ];then
      docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
    fi
-   wget -qO /usr/local/bin/qcollect  https://github.com/qnib/qcollect/releases/download/0.7.0.0/qcollect_0.7.0.0-dirty-0_Linux
+   wget -qO /usr/local/bin/qcollect  https://github.com/qnib/qcollect/releases/download/0.7.0.1/qcollect_0.7.0.1-dirty-1_Linux
    chmod +x /usr/local/bin/qcollect
    cp -r /vagrant/qcollect* /etc/
    sed -i"" -e "s/HOSTNAME/$(hostname -f)/" /etc/qcollect.conf
