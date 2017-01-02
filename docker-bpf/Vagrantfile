@@ -1,0 +1,56 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "swarm0",
+    :ip => "192.168.100.10"
+  }
+]
+
+$script = <<SCRIPT
+   echo "deb https://apt.dockerproject.org/repo ubuntu-xenial testing" > /etc/apt/sources.list.d/docker.list
+   apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+   apt-get update
+   apt-get install -y --allow-unauthenticated docker-engine python-pip
+   pip install --upgrade pip
+   pip install docker-py feedparser
+   # https://test.docker.com/builds/Linux/x86_64/docker-1.13.0-rc4.tgz
+   curl -fsL https://test.docker.com/builds/Linux/x86_64/docker-1.13.0-rc4.tgz |tar xfz - -C /usr/bin --strip-components=1
+   cp /vagrant/daemon.json /etc/docker/
+   cp /vagrant/docker.service /lib/systemd/system/docker.service
+   systemctl daemon-reload
+   service docker stop
+   rm -rf /var/lib/docker/*
+   cd /tmp/
+   wget -q http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.9/linux-headers-4.9.0-040900_4.9.0-040900.201612111631_all.deb
+   wget -q http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.9/linux-headers-4.9.0-040900-generic_4.9.0-040900.201612111631_amd64.deb
+   wget -q http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.9/linux-image-4.9.0-040900-generic_4.9.0-040900.201612111631_amd64.deb
+   dpkg -i *.deb
+   rm -f *.deb
+   wget -qO /usr/local/bin/qcollect  https://github.com/qnib/qcollect/releases/download/0.7.0.1/qcollect_0.7.0.1-dirty-1_Linux
+   chmod +x /usr/local/bin/qcollect
+   cp -r /vagrant/qcollect* /etc/
+   sed -i"" -e "s/HOSTNAME/$(hostname -f)/" /etc/qcollect.conf
+   cp /vagrant/qcollect.service /lib/systemd/system/
+   systemctl enable qcollect
+   reboot
+SCRIPT
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "bento/ubuntu-16.04"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 4096
+        vb.cpus = 2
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
