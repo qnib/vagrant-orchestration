@@ -1,0 +1,12 @@
+[Unit]
+Description=QCollect metrics collector
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+ExecStart=/usr/local/bin/qcollect
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
