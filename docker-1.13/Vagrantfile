@@ -18,16 +18,11 @@ $script = <<SCRIPT
    echo "deb https://apt.dockerproject.org/repo ubuntu-xenial testing" > /etc/apt/sources.list.d/docker.list
    apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
    apt-get update
-   apt-get install -y --allow-unauthenticated docker-engine
-   # Download 1.13.0-rc1-experimental
-   if [ ! -f /vagrant/binary-daemon.tar ];then
-     curl -fsLo /vagrant/binary-daemon.tar https://github.com/ChristianKniep/docker/releases/download/1.13.0-rc1-exp/binary-daemon.tar
-   fi
-   tar xf /vagrant/binary-daemon.tar -C /usr/bin/ >/dev/null
-   if [ ! -f /vagrant/binary-client.tar ];then
-     curl -fsLo /vagrant/binary-client.tar https://github.com/ChristianKniep/docker/releases/download/1.13.0-rc1-exp/binary-client.tar
-   fi
-   tar xf /vagrant/binary-client.tar -C /usr/bin/ >/dev/null
+   apt-get install -y --allow-unauthenticated docker-engine python-pip
+   pip install --upgrade pip
+   pip install docker-py feedparser
+   # Download 1.13
+   curl -fsL https://test.docker.com/builds/Linux/x86_64/docker-1.13.0-rc4.tgz |tar xfz - -C /usr/bin --strip-components=1
    cp /vagrant/daemon.json /etc/docker/
    cp /vagrant/docker.service /lib/systemd/system/docker.service
    systemctl daemon-reload
@@ -44,22 +39,22 @@ $script = <<SCRIPT
      docker network create -d overlay metric-net
      # create service
      docker service create --replicas=1 --name consul --network=metric-net \
-                           --port target=8500,published=8500,mode=ingress \
-                           -e CONSUL_BOOTSTRAP_EXPECT=1 \
-                           qnib/alpn-consul
+                            --publish target=8500,published=8500,mode=ingress \
+                            -e CONSUL_BOOTSTRAP_EXPECT=1 \
+                            qnib/alpn-consul
 
      sleep 5
      docker service create --replicas=1 --name influxdb --network=metric-net \
-                           --port target=8083,published=8083,mode=ingress \
-                           --port target=8086,published=8086,mode=ingress \
+                           --publish target=8083,published=8083,mode=ingress \
+                           --publish target=8086,published=8086,mode=ingress \
                            -e INFLUXDB_DATABASES=qcollect -e CONSUL_CLUSTER_IPS=consul \
                            qnib/influxdb
      docker service create --replicas=1 --name grafana3 --network=metric-net \
                            -e CONSUL_CLUSTER_IPS=consul \
-                           --port target=3000,published=3000,mode=ingress \
+                           --publish target=3000,published=3000,mode=ingress \
                            qnib/alpn-grafana3
      docker service create --name http --mode=global --mode=global \
-                           --port target=80,published=80,mode=ingress qnib/httpcheck
+                           --publish target=80,published=80,mode=ingress qnib/httpcheck
    fi
    if [ "$(hostname)" == "swarm1" ];then
      docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
@@ -84,7 +79,8 @@ Vagrant.configure(2) do |config|
       node.vm.hostname = machine[:hostname]
       node.vm.network "private_network", ip: machine[:ip]
       node.vm.provider "virtualbox" do |vb|
-        vb.customize ["modifyvm", :id, "--memory", 2048]
+        vb.memory = 4096
+        vb.cpus = 2
       end
       node.vm.provision "shell" do |s|
         s.inline = $script
