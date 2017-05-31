@@ -29,15 +29,26 @@ $script = <<SCRIPT
    fi 
    cp /vagrant/cache/go-github /usr/local/bin/
    set -x
-   for x in docker-containerd docker-init docker-linux-amd64 docker-proxy docker-runc dockerd;do
-      fUrl=$(go-github rLatestUrl --ghrepo docker-ce --regex "${x}.*")
-      if [[ $? -ne 0 ]];then
+   fUrl=$(go-github rLatestUrl --ghrepo docker-ce --regex "docked-.*")
+   fName=$(echo ${fUrl} |awk -F/ '{print $NF}')
+   if [[ ! -x /vagrant/cache/${fName} ]];then
+     echo "> wget -q ${fName}"
+     wget -q ${fUrl}
+     chmod +x ${fName}
+   fi
+   cp /vagrant/cache/${fName} /usr/bin/${fName}
+   mv /usr/bin/${fName} /usr/bin/dockerd
+   for x in docker-containerd docker-containerd-ctr  docker-containerd-shim docker-init docker-linux-amd64 docker-proxy docker-runc;do
+      if [[ ! -x /vagrant/cache/${x} ]];then
+        fUrl=$(go-github rLatestUrl --ghrepo docker-ce --regex "${x}$")
+        if [[ $? -ne 0 ]];then
           sleep 30
           fUrl=$(go-github rLatestUrl --ghrepo docker-ce --regex "${x}.*")
           if [[ $? -ne 0 ]];then
              echo "!!> Ran into timeout twice"
              exit 1
           fi
+        fi
       fi
       fName=$(echo ${fUrl} |awk -F/ '{print $NF}')
       if [[ ! -x /vagrant/cache/${fName} ]];then
