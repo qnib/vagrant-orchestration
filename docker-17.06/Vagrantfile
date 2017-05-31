@@ -1,0 +1,96 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "swarm0",
+    :ip => "192.168.100.10"
+  },{
+    :hostname => "swarm1",
+    :ip => "192.168.100.11"
+  },{
+    :hostname => "swarm2",
+    :ip => "192.168.100.12"  
+  }
+]
+
+$script = <<SCRIPT
+   echo "deb https://apt.dockerproject.org/repo ubuntu-xenial testing" > /etc/apt/sources.list.d/docker.list
+   apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+   apt-get update
+   apt-get install -y --allow-unauthenticated docker-engine python-pip
+   service docker stop
+   mkdir -p /vagrant/cache
+   cd /vagrant/cache
+   if [[ ! -x go-github ]];then
+       echo " >  wget -qO /vagrant/cache/go-github https://github.com/qnib/go-github/releases/download/0.2.2/go-github_0.2.2_Linux"
+       wget -qO /vagrant/cache/go-github https://github.com/qnib/go-github/releases/download/0.2.2/go-github_0.2.2_Linux
+       chmod +x /vagrant/cache/go-github
+   fi 
+   cp /vagrant/cache/go-github /usr/local/bin/
+   set -x
+   for x in docker-containerd docker-init docker-linux-amd64 docker-proxy docker-runc dockerd;do
+      fUrl=$(go-github rLatestUrl --ghrepo docker-ce --regex "${x}.*")
+      if [[ $? -ne 0 ]];then
+          sleep 30
+          fUrl=$(go-github rLatestUrl --ghrepo docker-ce --regex "${x}.*")
+          if [[ $? -ne 0 ]];then
+             echo "!!> Ran into timeout twice"
+             exit 1
+          fi
+      fi
+      fName=$(echo ${fUrl} |awk -F/ '{print $NF}')
+      if [[ ! -x /vagrant/cache/${fName} ]];then
+          echo "> wget -q ${fName}"
+          wget -q ${fUrl}
+          chmod +x ${fName}
+      fi
+      cp /vagrant/cache/${fName} /usr/bin/${fName}
+      if [[ "${fName}" =~ "dockerd-17.06" ]];then
+          mv /usr/bin/${fName} /usr/bin/dockerd
+      elif [[ "${fName}" =~ "docker-linux-amd64" ]];then
+          mv /usr/bin/${fName} /usr/bin/docker
+      fi
+   done
+   set -x
+   cd /root/
+   cp /vagrant/daemon.json /etc/docker/
+   cp /vagrant/docker.service /lib/systemd/system/docker.service
+   systemctl daemon-reload
+   rm -rf /var/lib/docker/*
+   service docker start
+   if [ "$(hostname)" == "swarm0" ];then
+     docker swarm init --advertise-addr=192.168.100.10
+     docker swarm join-token manager -q > /vagrant/token
+     #sleep 2
+     ## download image
+     #for img in grafana4 influxdb;do
+     #  docker pull qnib/plain-${img}
+     #done
+   fi
+   if [ "$(hostname)" == "swarm1" ];then
+     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
+   fi
+   if [ "$(hostname)" == "swarm2" ];then
+     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
+   fi
+   cd /tmp/
+SCRIPT
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "bento/ubuntu-16.04"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 2048
+        vb.cpus = 1
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
