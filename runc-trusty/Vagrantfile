@@ -13,12 +13,12 @@ $script = <<SCRIPT
    echo "deb https://apt.dockerproject.org/repo ubuntu-trusty testing" > /etc/apt/sources.list.d/docker.list
    apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
    apt-get update
-   apt-get install -y --allow-unauthenticated docker-engine
+   apt-get install -y --allow-unauthenticated docker-engine libseccomp2
    echo "####### Clone runc"
    git clone https://github.com/opencontainers/runc.git
    cd runc
    echo "####### Build runc within golang container"
-   docker run --rm -t -v $(pwd):/usr/local/src/github.com/opencontainers/runc -w /usr/local/src/github.com/opencontainers/runc qnib/uplain-golang make
+   docker run --rm -t -e ENTRYPOINTS_SKIP=true  -v $(pwd):/usr/local/src/github.com/opencontainers/runc -w /usr/local/src/github.com/opencontainers/runc qnib/uplain-golang make
    cp runc /usr/local/bin/
    cd ~vagrant/
    mkdir -p mpibench/rootfs

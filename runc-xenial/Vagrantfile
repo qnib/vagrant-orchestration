@@ -18,7 +18,7 @@ $script = <<SCRIPT
    git clone https://github.com/opencontainers/runc.git
    cd runc
    echo "####### Build runc within golang container"
-   docker run --rm -t -v $(pwd):/usr/local/src/github.com/opencontainers/runc -w /usr/local/src/github.com/opencontainers/runc qnib/uplain-golang make
+   docker run --rm -t -e ENTRYPOINTS_SKIP=true -v $(pwd):/usr/local/src/github.com/opencontainers/runc -w /usr/local/src/github.com/opencontainers/runc qnib/uplain-golang make
    cp runc /usr/local/bin/
    cd ~vagrant/
    mkdir -p mpibench/rootfs
