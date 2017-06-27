@@ -9,10 +9,25 @@ servers=[
 ]
 
 $script = <<SCRIPT
+   echo "####### Install Docker-engine"
    echo "deb https://apt.dockerproject.org/repo ubuntu-xenial testing" > /etc/apt/sources.list.d/docker.list
    apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
    apt-get update
    apt-get install -y --allow-unauthenticated docker-engine
+   echo "####### Clone runc"
+   git clone https://github.com/opencontainers/runc.git
+   cd runc
+   echo "####### Build runc within golang container"
+   docker run --rm -t -v $(pwd):/usr/local/src/github.com/opencontainers/runc -w /usr/local/src/github.com/opencontainers/runc qnib/uplain-golang make
+   cp runc /usr/local/bin/
+   cd ~vagrant/
+   mkdir -p mpibench/rootfs
+   cd mpibench
+   echo "####### Extract qnib/plain-osu-mpibench into rootfs"
+   docker export $(docker create docker.io/qnib/plain-osu-mpibench) | tar -C rootfs -xf -
+   chown -R vagrant: ~vagrant/mpibench
+   su -c 'runc spec --rootless' vagrant
+   su -c 'echo "runc --root=/tmp/mpibench run mpibench" >> ~vagrant/.bash_history' vagrant
 SCRIPT
 
 # This defines the version of vagrant
@@ -24,7 +39,7 @@ Vagrant.configure(2) do |config|
       node.vm.network "private_network", ip: machine[:ip]
       node.vm.provider "virtualbox" do |vb|
         vb.memory = 2048
-        vb.cpus = 1
+        vb.cpus = 2
       end
       node.vm.provision "shell" do |s|
         s.inline = $script
