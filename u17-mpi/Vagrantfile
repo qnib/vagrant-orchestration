@@ -1,0 +1,76 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "swarm0",
+    :ip => "192.168.100.10"
+  },{
+    :hostname => "swarm1",
+    :ip => "192.168.100.11"
+  },{
+    :hostname => "swarm2",
+    :ip => "192.168.100.12"
+  },{
+    :hostname => "swarm3",
+    :ip => "192.168.100.13"
+  }
+]
+
+$script = <<SCRIPT
+   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+   add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+   apt-get update
+   apt-get install -y --allow-unauthenticated \
+                    docker-ce python-pip \
+                    golang-1.8 \
+                    openmpi-bin libopenmpi-dev openssh-client
+   service docker stop
+   mkdir -p /vagrant/cache
+   cp /vagrant/cache/${fName} /usr/bin/${fName}
+   set -x
+   cd /root/
+   cp /vagrant/daemon.json /etc/docker/
+   cp /vagrant/docker.service /lib/systemd/system/docker.service
+   systemctl daemon-reload
+   rm -rf /var/lib/docker/*
+   service docker start
+   if [ "$(hostname)" == "swarm0" ];then
+     docker swarm init --advertise-addr=192.168.100.10
+     docker swarm join-token manager -q > /vagrant/token
+     go build -o /usr/local/bin/go-dssh /usr/local/src/go-dssh.go
+   fi
+   if [ "$(hostname)" == "swarm1" ];then
+     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
+   fi
+   if [ "$(hostname)" == "swarm2" ];then
+     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
+   fi
+   if [ "$(hostname)" == "swarm3" ];then
+     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.13 192.168.100.10:2377
+   fi
+SCRIPT
+
+## Environment
+ENV["LC_ALL"] = "en_US.UTF-8"
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.vm.synced_folder "src/", "/usr/local/src/"
+    config.vm.synced_folder "bin/", "/usr/local/bin/"
+    config.vm.synced_folder "ssh/", "/home/vagrant/.ssh"
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "bento/ubuntu-17.04"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 1024
+        vb.cpus = 1
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
