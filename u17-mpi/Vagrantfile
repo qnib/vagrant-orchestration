@@ -35,6 +35,16 @@ $script = <<SCRIPT
    systemctl daemon-reload
    rm -rf /var/lib/docker/*
    service docker start
+   useradd --no-create-home user
+   ###
+   echo "####### Clone runc"
+   git clone https://github.com/opencontainers/runc.git
+   cd runc
+   echo "####### Build runc within golang container"
+   docker run --rm -t -e ENTRYPOINTS_SKIP=true \
+              -v $(pwd):/usr/local/src/github.com/opencontainers/runc \
+              -w /usr/local/src/github.com/opencontainers/runc qnib/uplain-golang make
+   cp runc /usr/local/bin/
    if [ "$(hostname)" == "swarm0" ];then
      docker swarm init --advertise-addr=192.168.100.10
      docker swarm join-token manager -q > /vagrant/token
@@ -59,7 +69,7 @@ Vagrant.configure(2) do |config|
   servers.each do |machine|
     config.vm.synced_folder "src/", "/usr/local/src/"
     config.vm.synced_folder "bin/", "/usr/local/bin/"
-    config.vm.synced_folder "ssh/", "/home/vagrant/.ssh"
+    config.vm.synced_folder "ssh/", "/home/user/.ssh"
     config.vm.define machine[:hostname] do |node|
       node.vm.box = "bento/ubuntu-17.04"
       node.vm.hostname = machine[:hostname]
