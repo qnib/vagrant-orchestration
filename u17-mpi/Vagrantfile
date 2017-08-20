@@ -18,47 +18,55 @@ servers=[
 ]
 
 $script = <<SCRIPT
-   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-   add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-   apt-get update
-   apt-get install -y --allow-unauthenticated \
-                    docker-ce python-pip \
-                    golang-1.8 \
-                    openmpi-bin libopenmpi-dev openssh-client
-   service docker stop
-   mkdir -p /vagrant/cache
-   cp /vagrant/cache/${fName} /usr/bin/${fName}
-   set -x
-   cd /root/
-   cp /vagrant/daemon.json /etc/docker/
-   cp /vagrant/docker.service /lib/systemd/system/docker.service
-   systemctl daemon-reload
-   rm -rf /var/lib/docker/*
-   service docker start
-   useradd --no-create-home user
-   ###
-   echo "####### Clone runc"
-   git clone https://github.com/opencontainers/runc.git
-   cd runc
-   echo "####### Build runc within golang container"
-   docker run --rm -t -e ENTRYPOINTS_SKIP=true \
-              -v $(pwd):/usr/local/src/github.com/opencontainers/runc \
-              -w /usr/local/src/github.com/opencontainers/runc qnib/uplain-golang make
-   cp runc /usr/local/bin/
-   if [ "$(hostname)" == "swarm0" ];then
-     docker swarm init --advertise-addr=192.168.100.10
-     docker swarm join-token manager -q > /vagrant/token
-     go build -o /usr/local/bin/go-dssh /usr/local/src/go-dssh.go
-   fi
-   if [ "$(hostname)" == "swarm1" ];then
-     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
-   fi
-   if [ "$(hostname)" == "swarm2" ];then
-     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
-   fi
-   if [ "$(hostname)" == "swarm3" ];then
-     docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.13 192.168.100.10:2377
-   fi
+    set -x
+    systemctl stop docker
+    cd /root/
+    cp /vagrant/daemon.json /etc/docker/
+    cp /vagrant/docker.service /lib/systemd/system/docker.service
+    systemctl daemon-reload
+    rm -rf /var/lib/docker/*
+    service docker start
+    mkdir -p /home/user/.ssh/
+    cp /vagrant/ssh/* /home/user/.ssh/
+    chown -R user: /home/user
+    useradd --no-create-home --shell /bin/bash user
+    if [ "$(hostname)" == "swarm0" ];then
+        docker swarm init --advertise-addr=192.168.100.10
+        docker swarm join-token manager -q > /vagrant/token
+        go build -o /usr/local/bin/go-dssh /usr/local/src/go-dssh.go
+        fi
+    if [ "$(hostname)" == "swarm1" ];then
+        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
+        fi
+    if [ "$(hostname)" == "swarm2" ];then
+        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
+    fi
+    if [ "$(hostname)" == "swarm3" ];then
+        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.13 192.168.100.10:2377
+    fi
+    #### Munge
+    cp /vagrant/slurm/munge.key /etc/munge/
+    chown -R munge /etc/munge/munge.key
+    chmod 400 /etc/munge/munge.key
+    systemctl restart munge
+    #### Slurm config
+    cp /vagrant/slurm/slurm.conf /etc/slurm-llnl/
+    cp /vagrant/slurm/slurmctld.service /lib/systemd/system/
+    cp /vagrant/slurm/slurmd.service /lib/systemd/system/
+    systemctl daemon-reload
+    cp /vagrant/slurm/slurmctld.default /etc/default/slurmctld
+    cp /vagrant/slurm/slurmd.default /etc/default/slurmd
+    mkdir -p /var/spool/slurm.spool
+    chown -R slurm: /var/spool/slurm.spool
+    mkdir -p /var/spool/slurm.state
+    chown -R slurm: /var/spool/slurm.state
+    if [ "$(hostname)" == "swarm0" ];then
+        systemctl restart slurmctld
+    else
+        systemctl disable slurmctld
+        systemctl stop slurmctld
+    fi
+    systemctl restart slurmd
 SCRIPT
 
 ## Environment
@@ -67,11 +75,12 @@ ENV["LC_ALL"] = "en_US.UTF-8"
 # This defines the version of vagrant
 Vagrant.configure(2) do |config|
   servers.each do |machine|
+    config.ssh.username = "vagrant"
+    config.ssh.password = "vagrant"
     config.vm.synced_folder "src/", "/usr/local/src/"
     config.vm.synced_folder "bin/", "/usr/local/bin/"
-    config.vm.synced_folder "ssh/", "/home/user/.ssh"
     config.vm.define machine[:hostname] do |node|
-      node.vm.box = "bento/ubuntu-17.04"
+      node.vm.box = "qnib/u17-swarm"
       node.vm.hostname = machine[:hostname]
       node.vm.network "private_network", ip: machine[:ip]
       node.vm.provider "virtualbox" do |vb|
