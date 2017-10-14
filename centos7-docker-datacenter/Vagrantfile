@@ -1,0 +1,84 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hosttype => "ucp",
+    :image => "qnib/centos7-docker-ucp",
+    :box_url => "http://qnib.org/down/virtualbox-centos7-docker-ucp.box"
+    :scale => 1,
+    :ipOffset => 20,
+  },{
+    :hosttype => "dtr",
+    :image => "qnib/centos7-docker-dtr",
+    :box_url => "http://qnib.org/down/virtualbox-centos7-docker-dtr.box"
+    :scale => 1,
+    :ipOffset => 30,
+  },{
+    :hosttype => "node",
+    :image => "qnib/centos7-docker",
+    :box_url => "http://qnib.org/down/virtualbox-centos7-docker.box"
+    :scale => 1,
+    :ipOffset => 40,
+  }
+]
+
+$script = <<SCRIPT
+    echo ">>> $@"
+    UCP_VERSION=2.2.3
+    DTR_VERSION=2.3.3
+    HOST_TYPE=$1
+    IP_ADDR=$2
+    set -x
+    rm -f /etc/docker/daemon.json
+    if [ "$(hostname)" == "ucp0" ];then
+        docker swarm init --advertise-addr=${IP_ADDR}
+        docker swarm join-token worker -q > /vagrant/worker.token
+        docker swarm join-token manager -q > /vagrant/manager.token
+    elif [[ "${HOST_TYPE}" == "ucp" ]];then
+        docker swarm join --token $(cat /vagrant/manager.token) --advertise-addr=${IP_ADDR} 192.168.100.20
+    else
+        docker swarm join --token $(cat /vagrant/worker.token) --advertise-addr=${IP_ADDR} 192.168.100.20
+    fi
+    if [[ "${HOST_TYPE}" == "ucp" ]];then
+        docker run --rm --tty --name ucp -v /var/run/docker.sock:/var/run/docker.sock docker/ucp:${UCP_VERSION} \
+                            install --host-address ${IP_ADDR} --admin-username "${UCP_ADMIN:-moby}" --admin-password "${UCP_PASSWORD:-moby1234}" \
+                            --force-insecure-tcp --swarm-port 2378 --controller-port 9443
+    elif [ "$(hostname)" == "dtr0" ];then
+        docker rm -f $(docker ps -qa)
+        docker run --rm --tty --name dtr docker/dtr:${DTR_VERSION} \
+                            install --debug --ucp-url https://192.168.100.20:9443 --dtr-external-url https://${IP_ADDR}/ --ucp-node dtr0 \
+                            --ucp-username "${UCP_ADMIN:-moby}" --ucp-password "${UCP_PASSWORD:-moby1234}" --ucp-insecure-tls --replica-id AB0000000000
+    fi
+SCRIPT
+
+## Environment
+ENV["LC_ALL"] = "en_US.UTF-8"
+ENV["IP_PREFIX"] = "192.168.100"
+ENV["UCP_ADMIN"] = "moby"
+ENV["UCP_PASSWORD"] = "moby1234"
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.ssh.username = "vagrant"
+    config.ssh.password = "vagrant"
+    (0..machine[:scale]-1).each do |i|
+      config.vm.define "#{machine[:hosttype]}#{i}" do |node|
+        node.vm.box = machine[:image]
+        node.vm.box_url = machine[:box_url]
+        node.vm.hostname = "#{machine[:hosttype]}#{i}"
+        ip_addr = "#{ENV['IP_PREFIX']}.#{sprintf('%d', machine[:ipOffset] + i)}"
+        node.vm.network "private_network", ip: ip_addr
+        node.vm.provider "virtualbox" do |vb|
+          vb.memory = 4096
+          vb.cpus = 1
+        end
+        node.vm.provision "shell" do |s|
+          s.inline = $script
+          s.args = "#{machine[:hosttype]} #{ip_addr} #{machine[:manager]}"
+        end
+      end
+    end
+  end
+end
