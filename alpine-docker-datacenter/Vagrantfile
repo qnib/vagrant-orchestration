@@ -1,0 +1,102 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hosttype => "ucp",
+    :image => "qnib/alpine-docker-ucp",
+    :box_url => "http://qnib.org/down/virtualbox-alpine-docker-1710-ucp-2.2.3.box",
+    :scale => 1,
+    :ipOffset => 20,
+    :deploy_gocd => "false",
+  },{
+    :hosttype => "dtr",
+    :image => "qnib/alpine-docker-dtr",
+    :box_url => "http://qnib.org/down/virtualbox-alpine-docker-1710-dtr-2.3.3.box",
+    :scale => 1,
+    :ipOffset => 30,
+  },{
+    :hosttype => "node",
+    :image => "qnib/alpine-docker",
+    :box_url => "http://qnib.org/down/virtualbox-alpine-docker-1710.box",
+    :scale => 1,
+    :ipOffset => 40,
+  }
+]
+
+$script = <<SCRIPT
+    echo ">>> $@"
+    UCP_VERSION=2.2.3
+    DTR_VERSION=2.3.3
+    UCP_HOST=192.168.100.20
+    HOST_TYPE=$1
+    IP_ADDR=$2
+    DEPLOY_GOCD=$3
+    if [ "$(hostname)" == "ucp0" ];then
+        echo ">> docker swarm init --advertise-addr=${IP_ADDR}"
+        docker swarm init --advertise-addr=${IP_ADDR}
+        echo ">> Dump tokens"
+        docker swarm join-token worker -q > /vagrant/worker.token
+        docker swarm join-token manager -q > /vagrant/manager.token
+        if [ "X${DEPLOY_GOCD}" == "Xtrue" ];then
+            yum install -y unzip
+            wget -q https://github.com/qnib/service-orchestration/archive/master.zip
+            unzip master.zip
+            pushd service-orchestration-master/misc/cicd/gocd/openldap
+            docker stack deploy -c docker-compose.yml gocd
+            popd
+            rm -rf service-orchestration-master/misc/cicd/gocd/openldap master.zip
+        fi
+    else
+        echo ">> Join SWARM as worker"
+        docker swarm join --token $(cat /vagrant/worker.token) --advertise-addr=${IP_ADDR} ${UCP_HOST}
+    fi
+    if [[ "${HOST_TYPE}" == "ucp" ]];then
+        echo ">> Install UCP"
+        echo "docker run --rm --tty --name ucp -v /var/run/docker.sock:/var/run/docker.sock docker/ucp:${UCP_VERSION} \ "
+        echo "           install --host-address ${IP_ADDR} --admin-username \"${UCP_ADMIN:-moby}\" --admin-password \"${UCP_PASSWORD:-moby1234}\" \ "
+        echo "           --force-insecure-tcp --swarm-port 2378 --controller-port 9443"
+        docker run --rm --tty --name ucp -v /var/run/docker.sock:/var/run/docker.sock docker/ucp:${UCP_VERSION} \
+                            install --host-address ${IP_ADDR} --admin-username "${UCP_ADMIN:-moby}" --admin-password "${UCP_PASSWORD:-moby1234}" \
+                            --force-insecure-tcp --swarm-port 2378 --controller-port 9443
+    elif [ "$(hostname)" == "dtr0" ];then
+        echo ">> Install DTR"
+        echo "docker run --rm --tty --name dtr docker/dtr:${DTR_VERSION} \ "
+        echo "           install --debug --ucp-url https://${UCP_HOST}:9443 --dtr-external-url https://${IP_ADDR}/ --ucp-node dtr0 \ "
+        echo "           --ucp-username \"${UCP_ADMIN:-moby}\" --ucp-password \"${UCP_PASSWORD:-moby1234}\" --ucp-insecure-tls --replica-id AB0000000000"
+        docker run --rm --tty --name dtr docker/dtr:${DTR_VERSION} \
+                    install --debug --ucp-url https://${UCP_HOST}:9443 --dtr-external-url https://${IP_ADDR}/ --ucp-node dtr0 \
+                    --ucp-username "${UCP_ADMIN:-moby}" --ucp-password "${UCP_PASSWORD:-moby1234}" --ucp-insecure-tls --replica-id AB0000000000
+    fi
+SCRIPT
+
+## Environment
+ENV["LC_ALL"] = "en_US.UTF-8"
+ENV["IP_PREFIX"] = "192.168.100"
+ENV["UCP_ADMIN"] = "moby"
+ENV["UCP_PASSWORD"] = "moby1234"
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.ssh.username = "vagrant"
+    config.ssh.password = "vagrant"
+    (0..machine[:scale]-1).each do |i|
+      config.vm.define "#{machine[:hosttype]}#{i}" do |node|
+        node.vm.box = machine[:image]
+        node.vm.box_url = machine[:box_url]
+        node.vm.hostname = "#{machine[:hosttype]}#{i}"
+        ip_addr = "#{ENV['IP_PREFIX']}.#{sprintf('%d', machine[:ipOffset] + i)}"
+        node.vm.network "private_network", ip: ip_addr
+        node.vm.provider "virtualbox" do |vb|
+          vb.memory = 4096
+          vb.cpus = 1
+        end
+        node.vm.provision "shell" do |s|
+          s.inline = $script
+          s.args = "#{machine[:hosttype]} #{ip_addr} #{machine[:deploy_gocd]}"
+        end
+      end
+    end
+  end
+end
