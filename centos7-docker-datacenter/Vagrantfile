@@ -5,19 +5,19 @@ servers=[
   {
     :hosttype => "ucp",
     :image => "qnib/centos7-docker-ucp",
-    :box_url => "http://qnib.org/down/virtualbox-centos7-docker-ucp.box"
+    :box_url => "http://qnib.org/down/virtualbox-centos7-docker-ucp.box",
     :scale => 1,
     :ipOffset => 20,
   },{
     :hosttype => "dtr",
     :image => "qnib/centos7-docker-dtr",
-    :box_url => "http://qnib.org/down/virtualbox-centos7-docker-dtr.box"
+    :box_url => "http://qnib.org/down/virtualbox-centos7-docker-dtr.box",
     :scale => 1,
     :ipOffset => 30,
   },{
     :hosttype => "node",
     :image => "qnib/centos7-docker",
-    :box_url => "http://qnib.org/down/virtualbox-centos7-docker.box"
+    :box_url => "http://qnib.org/down/virtualbox-centos7-docker.box",
     :scale => 1,
     :ipOffset => 40,
   }
