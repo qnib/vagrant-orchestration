@@ -1,0 +1,40 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "criu0",
+    :ip => "192.168.100.10"
+  },{
+    :hostname => "criu1",
+    :ip => "192.168.100.11"
+  }
+]
+
+$script = <<SCRIPT
+   curl -fsSL "${1}/ubuntu/gpg" | apt-key add -
+   add-apt-repository "deb [arch=amd64] $1/ubuntu $(lsb_release -cs) stable"
+   apt-get update
+   rm -f /var/lib/dpkg/lock
+   apt-get install -y docker-ee
+   apt-get install -y criu
+SCRIPT
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "qnib/centos7-docker"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 2048
+        vb.cpus = 1
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+        s.args   = "#{ENV['DOCKER_EE_URL']}"
+      end
+    end
+  end
+end
