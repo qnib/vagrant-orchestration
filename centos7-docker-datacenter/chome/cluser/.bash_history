@@ -82,3 +82,12 @@ docker exec -t -u cluser b072fae44f26a4192f20e7f28369a4929fc3c44ea754e3c8420c742
 docker exec -t -u cluser b072fae44f26a4192f20e7f28369a4929fc3c44ea754e3c8420c742867858d1e orted
 mpirun -mca plm_rsh_agent go-wharfie --host node0,node1 np hello
 mpirun -mca plm_rsh_agent go-wharfie --host node0,node1 np hello
+ls
+export SLURM_JOB_ID=1
+mpirun -mca plm_rsh_agent go-wharfie --host ucp0,node0 -np 2 hello
+docker ps
+export SLURM_JOB_ID=1
+mpirun -mca plm_rsh_agent go-wharfie --host ucp0,node0 -np 2 hello
+docker service ls
+unset SLURM_JOB_ID
+mpirun -mca plm_rsh_agent go-wharfie --host ucp0,node0 -np 2 hello

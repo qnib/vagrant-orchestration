@@ -4,21 +4,18 @@
 servers=[
   {
     :hosttype => "ucp",
-    :image => "qnib/alpine-docker-ucp",
-    :box_url => "http://qnib.org/down/virtualbox-alpine-docker-1710-ucp-2.2.3.box",
+    :image => "alpine-3.7",
+    #:image => "qnib/alpine-docker",
     :scale => 1,
     :ipOffset => 20,
-    :deploy_gocd => "false",
   },{
     :hosttype => "dtr",
-    :image => "qnib/alpine-docker-dtr",
-    :box_url => "http://qnib.org/down/virtualbox-alpine-docker-1710-dtr-2.3.3.box",
+    :image => "qnib/alpine-docker",
     :scale => 1,
     :ipOffset => 30,
   },{
     :hosttype => "node",
     :image => "qnib/alpine-docker",
-    :box_url => "http://qnib.org/down/virtualbox-alpine-docker-1710.box",
     :scale => 1,
     :ipOffset => 40,
   }
@@ -26,7 +23,7 @@ servers=[
 
 $script = <<SCRIPT
     echo ">>> $@"
-    UCP_VERSION=2.2.3
+    UCP_VERSION=3.0.0-beta1
     DTR_VERSION=2.3.3
     UCP_HOST=192.168.100.20
     HOST_TYPE=$1
@@ -79,8 +76,6 @@ ENV["UCP_PASSWORD"] = "moby1234"
 # This defines the version of vagrant
 Vagrant.configure(2) do |config|
   servers.each do |machine|
-    config.ssh.username = "vagrant"
-    config.ssh.password = "vagrant"
     (0..machine[:scale]-1).each do |i|
       config.vm.define "#{machine[:hosttype]}#{i}" do |node|
         node.vm.box = machine[:image]
@@ -89,12 +84,12 @@ Vagrant.configure(2) do |config|
         ip_addr = "#{ENV['IP_PREFIX']}.#{sprintf('%d', machine[:ipOffset] + i)}"
         node.vm.network "private_network", ip: ip_addr
         node.vm.provider "virtualbox" do |vb|
-          vb.memory = 4096
+          vb.memory = 3072
           vb.cpus = 1
         end
         node.vm.provision "shell" do |s|
           s.inline = $script
-          s.args = "#{machine[:hosttype]} #{ip_addr} #{machine[:deploy_gocd]}"
+          s.args = "#{machine[:hosttype]} #{ip_addr}"
         end
       end
     end

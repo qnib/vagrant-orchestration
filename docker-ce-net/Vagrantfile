@@ -26,16 +26,18 @@ $script = <<SCRIPT
        $(lsb_release -cs) \
        stable"
     apt-get update
-    apt-get install -y docker-ce
+    apt-get install -y docker-ce iftop
     if [ "$(hostname)" == "swarm0" ];then
-        docker swarm init --advertise-addr=192.168.100.10
+        docker swarm init --advertise-addr=192.168.100.10 --data-path-addr=192.168.101.10
         docker swarm join-token manager -q > /vagrant/token
+        cd /vagrant/
+        docker stack deploy -c docker-compose.yml perf
         fi
     if [ "$(hostname)" == "swarm1" ];then
-        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
-        fi
+        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 --data-path-addr=192.168.101.11 192.168.100.10:2377
+    fi
     if [ "$(hostname)" == "swarm2" ];then
-        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
+        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 --data-path-addr=192.168.101.12 192.168.100.10:2377
     fi
 SCRIPT
 

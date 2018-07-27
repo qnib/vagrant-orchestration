@@ -3,7 +3,7 @@ $Env:DOCKER_CERT_PATH = $(Split-Path $script:MyInvocation.MyCommand.Path)
 $Env:DOCKER_HOST = "tcp://192.168.100.20:9443"
 #
 # Bundle for user moby
-# UCP Instance ID 6d8ihxdypwr7wkbg4rt99oes6
+# UCP Instance ID sonhmf5a40uyhvexsiqgcyzbx
 #
 # This admin cert will also work directly against Swarm and the individual
 # engine proxies for troubleshooting.  After sourcing this env file, use

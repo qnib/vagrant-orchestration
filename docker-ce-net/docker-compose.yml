@@ -1,0 +1,35 @@
+version: '3.6'
+services:
+   srv0:
+      image: qnib/pinger:iperf
+      environment:
+       - REMOTE_HOST=tasks.srv1
+      deploy:
+        placement:
+          constraints:
+            - node.hostname == swarm0
+      networks:
+       - testnet
+   srv1:
+      image: qnib/pinger:iperf
+      deploy:
+        placement:
+          constraints:
+            - node.hostname == swarm1
+      networks:
+       - testnet
+      environment:
+       - REMOTE_HOST=tasks.srv2
+   srv2:
+      image: qnib/pinger:iperf
+      deploy:
+        placement:
+          constraints:
+            - node.hostname == swarm2
+      environment:
+       - REMOTE_HOST=tasks.srv1
+      networks:
+       - testnet
+
+networks:
+  testnet:

@@ -4,7 +4,7 @@ set DOCKER_CERT_PATH=%~dp0
 set DOCKER_HOST=tcp://192.168.100.20:9443
 REM
 REM Bundle for user moby
-REM UCP Instance ID 6d8ihxdypwr7wkbg4rt99oes6
+REM UCP Instance ID sonhmf5a40uyhvexsiqgcyzbx
 REM
 REM This admin cert will also work directly against Swarm and the individual
 REM engine proxies for troubleshooting.  After sourcing this env file, use

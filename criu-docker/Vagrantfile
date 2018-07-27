@@ -24,7 +24,7 @@ SCRIPT
 Vagrant.configure(2) do |config|
   servers.each do |machine|
     config.vm.define machine[:hostname] do |node|
-      node.vm.box = "qnib/centos7-docker"
+      node.vm.box = "bento/ubuntu-16.04"
       node.vm.hostname = machine[:hostname]
       node.vm.network "private_network", ip: machine[:ip]
       node.vm.provider "virtualbox" do |vb|
