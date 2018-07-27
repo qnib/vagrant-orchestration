@@ -5,6 +5,9 @@ services:
       environment:
        - REMOTE_HOST=tasks.srv1
       deploy:
+        resources:
+          limits:
+            cpus: '0.25'
         placement:
           constraints:
             - node.hostname == swarm0
@@ -13,6 +16,9 @@ services:
    srv1:
       image: qnib/pinger:iperf
       deploy:
+        resources:
+          limits:
+            cpus: '0.25'
         placement:
           constraints:
             - node.hostname == swarm1
@@ -23,6 +29,9 @@ services:
    srv2:
       image: qnib/pinger:iperf
       deploy:
+        resources:
+          limits:
+            cpus: '0.25'
         placement:
           constraints:
             - node.hostname == swarm2
