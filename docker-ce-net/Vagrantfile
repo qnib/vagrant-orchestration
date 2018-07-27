@@ -1,0 +1,64 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "swarm0",
+    :ip0 => "192.168.100.10",
+    :ip1 => "192.168.101.10"
+  },{
+    :hostname => "swarm1",
+    :ip0 => "192.168.100.11",
+    :ip1 => "192.168.101.11"
+  },{
+    :hostname => "swarm2",
+    :ip0 => "192.168.100.12",
+    :ip1 => "192.168.101.12"
+  }
+]
+
+$script = <<SCRIPT
+    set -x
+    apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository \
+       "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+       $(lsb_release -cs) \
+       stable"
+    apt-get update
+    apt-get install -y docker-ce
+    if [ "$(hostname)" == "swarm0" ];then
+        docker swarm init --advertise-addr=192.168.100.10
+        docker swarm join-token manager -q > /vagrant/token
+        fi
+    if [ "$(hostname)" == "swarm1" ];then
+        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.11 192.168.100.10:2377
+        fi
+    if [ "$(hostname)" == "swarm2" ];then
+        docker swarm join --token $(cat /vagrant/token) --advertise-addr=192.168.100.12 192.168.100.10:2377
+    fi
+SCRIPT
+
+## Environment
+ENV["LC_ALL"] = "en_US.UTF-8"
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  servers.each do |machine|
+    config.ssh.username = "vagrant"
+    config.ssh.password = "vagrant"
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "bento/ubuntu-16.04"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip0]
+      node.vm.network "private_network", ip: machine[:ip1]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 1024
+        vb.cpus = 1
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
