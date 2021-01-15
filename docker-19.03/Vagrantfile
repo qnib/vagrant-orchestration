@@ -1,0 +1,47 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "swarm0",
+    :ip => "192.168.100.10"
+  }
+]
+
+$script = <<SCRIPT
+  apt-get update
+  apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg-agent \
+    software-properties-common
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+  add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+    $(lsb_release -cs) \
+    stable"
+  apt-get install -y --allow-unauthenticated docker-ce python-pip
+  apt-get update
+  apt-get install docker-ce docker-ce-cli containerd.io
+SCRIPT
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "bento/ubuntu-18.04"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 2048
+        vb.cpus = 1
+        vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
