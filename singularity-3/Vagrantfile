@@ -1,0 +1,36 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+servers=[
+  {
+    :hostname => "node1",
+    :ip => "192.168.100.10"
+  }
+]
+
+$script = <<SCRIPT
+    yum update -y
+    yum install -y epel-release
+    yum update -y 
+    yum install -y singularity
+SCRIPT
+
+# This defines the version of vagrant
+Vagrant.configure(2) do |config|
+  
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.box = "centos/7"
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 2048
+        vb.cpus = 1
+        vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      end
+      node.vm.provision "shell" do |s|
+        s.inline = $script
+      end
+    end
+  end
+end
