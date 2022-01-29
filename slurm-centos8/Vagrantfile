@@ -20,21 +20,23 @@ servers=[
 
 Vagrant.configure("2") do |config|
   config.vm.define "headnode", primary: true do |hnode|
-    hnode.vm.box = "qnib/centos8-slurmctld"
-    hnode.vm.box_version = "2022.01.25"
+    #hnode.vm.box = "qnib/centos8-slurmctld"
+    hnode.vm.box = "centos8-slurmctld"
+    #hnode.vm.box_version = "2022.01.25"
     hnode.vbguest.auto_update = false
     hnode.vm.network "private_network", ip: "192.168.56.10"
     hnode.vm.provision :hosts, :sync_hosts => true
     hnode.vm.hostname = "headnode"
   end
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = 2048
-    vb.cpus = 2
+    vb.memory = 4096
+    vb.cpus = 4
   end
   servers.each do |machine|
     config.vm.define machine[:hostname], autostart:machine[:autostart] do |node|
-      node.vm.box = "qnib/centos8-slurmd"
-      node.vm.box_version = "2022.01.25"
+      node.vm.box = "centos8-slurmd"
+      #node.vm.box = "qnib/centos8-slurmd"
+      #node.vm.box_version = "2022.01.25"
       node.vbguest.auto_update = false
       node.vm.hostname = machine[:hostname]
       node.vm.network "private_network", ip: machine[:ip]
