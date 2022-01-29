@@ -1,0 +1,48 @@
+servers=[
+  {
+    :hostname => "compute1",
+    :ip => "192.168.56.11",
+    :autostart => true
+  },{
+    :hostname => "compute2",
+    :ip => "192.168.56.12",
+    :autostart => false
+  },{
+    :hostname => "compute3",
+    :ip => "192.168.56.13",
+    :autostart => false
+  },{
+    :hostname => "compute4",
+    :ip => "192.168.56.14",
+    :autostart => false
+  }
+]
+
+Vagrant.configure("2") do |config|
+  config.vm.define "headnode", primary: true do |hnode|
+    #hnode.vm.box = "qnib/rocky8-slurmctld"
+    hnode.vm.box = "rocky8-slurmctld"
+    #hnode.vm.box_version = "2022.01.29"
+    hnode.vbguest.auto_update = false
+    hnode.vm.network "private_network", ip: "192.168.56.10"
+    hnode.vm.hostname = "headnode"
+  end
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = 4096
+    vb.cpus = 4
+  end
+  servers.each do |machine|
+    config.vm.define machine[:hostname], autostart:machine[:autostart] do |node|
+      node.vm.box = "rocky8-slurmd"
+      #node.vm.box = "qnib/rocky8-slurmd"
+      #node.vm.box_version = "2022.01.29"
+      node.vbguest.auto_update = false
+      node.vm.hostname = machine[:hostname]
+      node.vm.network "private_network", ip: machine[:ip]
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = 1024
+        vb.cpus = 1
+      end
+    end
+  end
+end
