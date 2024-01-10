@@ -1,0 +1,54 @@
+mynodes=[
+  {
+    :hostname => "controller",
+    :box => "generic/ubuntu2204",
+    :memory => 8192,
+    :cpu => 4,
+  },{
+    :hostname => "worker-01",
+    :box => "generic/ubuntu2204",
+    :memory => 2048,
+    :cpu => 2
+  },{
+    :hostname => "worker-02",
+    :box => "generic/ubuntu2204",
+    :memory => 2048,
+    :cpu => 2
+  },{
+    :hostname => "worker-03",
+    :box => "generic/ubuntu2204",
+    :memory => 2048,
+    :cpu => 2
+  }
+]
+Vagrant.configure("2") do |config|
+  config.vm.synced_folder ".", "/vagrant"
+  mynodes.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+        node.vm.box = machine[:box]
+        node.vm.hostname = machine[:hostname]
+        node.vm.provider :libvirt do |domain|
+          domain.memory = machine[:memory]
+          domain.cpus = machine[:cpu]
+        end
+        config.vm.provision :ansible do |ansible|
+          ansible.playbook = "ansible/hosts.yaml"
+        end
+        config.vm.provision :ansible do |ansible|
+          ansible.playbook = "ansible/k8s-install.yaml"
+        end
+        if machine[:hostname] == 'controller'
+          config.vm.provision :ansible do |ansible|
+            ansible.playbook = "ansible/k8s-init.yaml"
+          end
+        else
+          config.vm.provision :ansible do |ansible|
+            ansible.groups = {
+              "worker" => ["worker-01","worker-02","worker-03"]
+            }
+            ansible.playbook = "ansible/k8s-join.yaml"
+          end
+        end
+    end
+  end 
+end

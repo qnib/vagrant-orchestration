@@ -1,0 +1,86 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Install aptitude
+      apt:
+        name: aptitude
+        state: latest
+        update_cache: true
+    - name: Install required system packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+        state: latest
+        update_cache: true
+    - name: Add  GPG apt Key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+    - name: Add kubernetes repo
+      ansible.builtin.apt_repository:
+        repo: deb  http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+        filename: kubernetes
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu jammy stable
+        state: present
+    - name: Install required kube packages
+      apt:
+        pkg:
+          - kubeadm
+          - kubelet
+          - kubectl
+          - containerd.io
+        state: latest
+        update_cache: true
+    - name: render template for kubeadm
+      template:
+        src: templates/container.config.toml.j2
+        dest: /etc/containerd/config.toml
+      register: containerd_config
+    - name: restart service
+      service:
+        name: containerd
+        state: restarted
+      when: containerd_config.changed
+    - name: Disable SWAP since kubernetes can't work with swap enabled (1/2)
+      shell: |
+        swapoff -a
+    - name: Add the overlay module
+      modprobe:
+        name: overlay
+        state: present
+    - name: Add the br_netfilter module
+      modprobe:
+        name: br_netfilter
+        state: present
+    - name: bridge-nf-call-ip6tables
+      ansible.posix.sysctl:
+        name: net.bridge.bridge-nf-call-ip6tables
+        value: '1'
+        sysctl_file: /tmp/test_sysctl.conf
+        reload: true
+    - name: bridge-nf-call-iptables
+      ansible.posix.sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: '1'
+        sysctl_file: /tmp/test_sysctl.conf
+        reload: true
+    - name: net.ipv4.ip_forward
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_file: /tmp/test_sysctl.conf
+        reload: true 

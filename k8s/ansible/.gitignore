@@ -1,0 +1,4 @@
+config
+ansible/bin/k8s-join.sh
+kubectl
+.vagrant

@@ -1,0 +1,18 @@
+---
+- hosts: worker
+  become: true
+  tasks:
+    - stat: path=/etc/kubernetes/kubelet.conf
+      register: kletfile
+    - name: copy admin.conf to .kube/config
+      ansible.builtin.copy:
+        src: bin/k8s-join.sh
+        dest: /home/vagrant/k8s-join.sh
+        owner: vagrant
+        group: vagrant
+        mode: '0755'
+      when: kletfile.stat.exists == false
+    - name: Join the cluster
+      shell: bash -x /home/vagrant/k8s-join.sh
+      when: kletfile.stat.exists == false
+    

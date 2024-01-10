@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: <redacted>
+    #server: https://api.server.address:6443
+    server: https://127.0.0.1:12345

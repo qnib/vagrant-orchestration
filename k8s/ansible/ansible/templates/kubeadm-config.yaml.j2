@@ -1,0 +1,6 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: "{{ kubeadm_version_output }}"
+controlPlaneEndpoint: "{{ ansible_facts['hostname'] }}:6443"
+networking:
+  podSubnet: 192.168.0.0/16

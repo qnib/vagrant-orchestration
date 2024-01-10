@@ -1,0 +1,49 @@
+---
+- hosts: controller
+  become: true
+  tasks:
+    - stat: path=/opt/kubeadm-config.yaml
+      register: kfile
+    - name: Register kubeadm version that is installed on system
+      shell: kubeadm version -o short |sed 's/v//g'
+      register: kubeadm_version_output
+    - name: set version as fact
+      set_fact:
+        kubeadm_version_output: "{{ kubeadm_version_output.stdout }}"
+    - name: render template for kubeadm
+      template:
+        src: templates/kubeadm-config.yaml.j2
+        dest: /opt/kubeadm-config.yaml
+      when: kfile.stat.exists == false
+    - name: Initialize the cluster
+      shell: kubeadm init --config=/opt/kubeadm-config.yaml --upload-certs
+      register: result
+      when: kfile.stat.exists == false
+    - stat: path=/etc/kubernetes/admin.conf
+      register: cfgfile
+    # Copy kube config to vagrant user
+    - name: make sure .kube folder exists
+      ansible.builtin.file:
+        path: /home/vagrant/.kube
+        owner: vagrant
+        group: vagrant
+        state: directory
+        mode: '0755'
+    - name: copy admin.conf to .kube/config
+      ansible.builtin.copy:
+        remote_src: true
+        src: /etc/kubernetes/admin.conf
+        dest: /home/vagrant/.kube/config
+        owner: vagrant
+        group: vagrant
+        mode: '0644'
+    - name: Apply metrics-server manifest to the cluster.
+      remote_user: vagrant
+      shell: /vagrant/ansible/bin/install_cni.sh
+    - name: Create join command
+      shell: kubeadm token create --print-join-command > /opt/k8s-join.sh
+    - name: Copy k8s-join command
+      ansible.builtin.fetch:
+        src: /opt/k8s-join.sh
+        dest: bin/k8s-join.sh
+        flat: yes
