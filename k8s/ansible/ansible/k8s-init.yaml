@@ -15,13 +15,14 @@
         src: templates/kubeadm-config.yaml.j2
         dest: /opt/kubeadm-config.yaml
       when: kfile.stat.exists == false
+    - stat: path=/etc/kubernetes/admin.conf
+      register: cfgfile
     - name: Initialize the cluster
       shell: kubeadm init --config=/opt/kubeadm-config.yaml --upload-certs
       register: result
-      when: kfile.stat.exists == false
+      when: cfgfile.stat.exists == false
     - stat: path=/etc/kubernetes/admin.conf
       register: cfgfile
-    # Copy kube config to vagrant user
     - name: make sure .kube folder exists
       ansible.builtin.file:
         path: /home/vagrant/.kube
@@ -37,13 +38,17 @@
         owner: vagrant
         group: vagrant
         mode: '0644'
+      when: cfgfile.stat.exists == true
     - name: Apply metrics-server manifest to the cluster.
       remote_user: vagrant
       shell: /vagrant/ansible/bin/install_cni.sh
+      when: cfgfile.stat.exists == true
     - name: Create join command
       shell: kubeadm token create --print-join-command > /opt/k8s-join.sh
+      when: cfgfile.stat.exists == true
     - name: Copy k8s-join command
       ansible.builtin.fetch:
         src: /opt/k8s-join.sh
         dest: bin/k8s-join.sh
         flat: yes
+      when: cfgfile.stat.exists == true

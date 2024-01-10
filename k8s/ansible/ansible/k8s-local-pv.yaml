@@ -1,0 +1,27 @@
+---
+- hosts: worker
+  become: true
+  tasks:
+    - name: Create PV dir
+      ansible.builtin.file:
+        path: /data/volumes/pv1
+        owner: vagrant
+        group: vagrant
+        state: directory
+        mode: '0777'
+
+- hosts: controller
+  tasks:
+    - name: Create PV for worker nodes
+      template:
+        src: templates/persistent-volume.yaml.j2
+        dest: "/home/vagrant/pv-{{ item }}.yaml"
+        owner: vagrant
+        group: vagrant
+        mode: 0644
+      with_items: "{{ groups.worker }}"
+    - name: Apply LV for worker nodes
+      shell: kubectl apply -f /home/vagrant/pv-{{ item }}.yaml
+      when:  item != 'controller'
+      with_items: "{{ groups.all }}"
+    

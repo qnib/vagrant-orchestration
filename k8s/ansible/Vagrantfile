@@ -50,5 +50,15 @@ Vagrant.configure("2") do |config|
           end
         end
     end
+    config.vm.provision :ansible do |ansible|
+      ansible.groups = {
+              "worker" => ["worker-01","worker-02","worker-03"],
+              "worker:vars" => {
+                  "pv_size" => "15Gi",
+                  "pv_path" => "/data/volumes/pv1"
+                }
+            }
+      ansible.playbook = "ansible/k8s-local-pv.yaml"
+    end
   end 
 end

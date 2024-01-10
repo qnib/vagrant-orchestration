@@ -15,4 +15,10 @@
     - name: Join the cluster
       shell: bash -x /home/vagrant/k8s-join.sh
       when: kletfile.stat.exists == false
-    
+    - name: Create PV dir
+      ansible.builtin.file:
+        path: /data/volumes/pv1
+        owner: vagrant
+        group: vagrant
+        state: directory
+        mode: '0777'
